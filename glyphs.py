@@ -239,7 +239,7 @@ def main() -> None:
 	)
 	glyph_filter = st.multiselect(
 		"Filter spells by glyphs",
-		options=all_glyphs,
+		options=selected_set,
 		help="Choose one or more glyphs to narrow the spell list.",
 	)
 	match_mode = st.radio(
