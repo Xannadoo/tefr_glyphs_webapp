@@ -158,6 +158,20 @@ def toggle_ked() -> None:
 	st.session_state.ked_learned = not st.session_state.ked_learned
 
 
+def check_gm_password() -> None:
+	entered = st.session_state.get("gm_password_input", "")
+	real_password = st.secrets.get("gm_password", None)
+	if real_password is None:
+		st.session_state.gm_unlocked = False
+		st.session_state.gm_password_error = "No GM password has been configured for this app yet."
+	elif entered == real_password:
+		st.session_state.gm_unlocked = True
+		st.session_state.gm_password_error = ""
+	else:
+		st.session_state.gm_unlocked = False
+		st.session_state.gm_password_error = "Incorrect password."
+
+
 def main() -> None:
 	st.set_page_config(page_title="Glyph Spell Finder", layout="wide")
 	st.title("Glyph Spell Finder")
@@ -184,6 +198,10 @@ def main() -> None:
 		st.session_state.selected_glyphs = []
 	if "ked_learned" not in st.session_state:
 		st.session_state.ked_learned = False
+	if "gm_unlocked" not in st.session_state:
+		st.session_state.gm_unlocked = False
+	if "gm_password_error" not in st.session_state:
+		st.session_state.gm_password_error = ""
 
 	st.session_state.selected_glyphs = _normalize_selected_glyphs(st.session_state.selected_glyphs)
 
@@ -205,9 +223,9 @@ def main() -> None:
 	selected_set = set(st.session_state.selected_glyphs)
 	for category_name, glyphs in GLYPH_GROUPS:
 		st.markdown(f"#### {category_name}")
-		glyph_columns = st.columns(5)
+		glyph_columns = st.columns(10)
 		for idx, glyph in enumerate(glyphs):
-			with glyph_columns[idx % 5]:
+			with glyph_columns[idx % 10]:
 				with st.container(border=True):
 					image_path = find_glyph_image(glyph)
 					render_glyph_tile(glyph, image_path)
@@ -230,16 +248,41 @@ def main() -> None:
 						)
 
 	st.divider()
+
+	with st.expander("GM access", expanded=False):
+		if st.session_state.gm_unlocked:
+			st.success("GM access unlocked — all spell levels available.")
+			if st.button("Lock again"):
+				st.session_state.gm_unlocked = False
+				st.rerun()
+		else:
+			st.caption("Players: skip this. GMs can enter the password to unlock higher-level spells (spoilers for NPC design).")
+			st.text_input("GM password", type="password", key="gm_password_input")
+			st.button("Unlock", on_click=check_gm_password)
+			if st.session_state.gm_password_error:
+				st.error(st.session_state.gm_password_error)
+
 	st.subheader("Filters")
+
+	# Players default to 2-glyph spells and can't see beyond them.
+	# GMs (password-unlocked) get the full range, defaulting to everything.
+	player_cap = min(2, max_count)
+	if st.session_state.gm_unlocked:
+		slider_max = max_count
+		default_range = (min_count, max_count)
+	else:
+		slider_max = player_cap
+		default_range = (min_count, player_cap)
+
 	count_range = st.slider(
 		"Spell size (glyphs per spell)",
 		min_value=min_count,
-		max_value=max_count,
-		value=(min_count, max_count),
+		max_value=slider_max,
+		value=default_range,
 	)
 	glyph_filter = st.multiselect(
 		"Filter spells by glyphs",
-		options=selected_set,
+		options=all_glyphs,
 		help="Choose one or more glyphs to narrow the spell list.",
 	)
 	match_mode = st.radio(
@@ -255,10 +298,11 @@ def main() -> None:
 	if st.session_state.ked_learned:
 		st.info("Ked learned: infinity-Key spells can be made permanent.")
 
+	effective_max = count_range[1] if st.session_state.gm_unlocked else min(count_range[1], player_cap)
 	results = [
 		spell
 		for spell in spells
-		if count_range[0] <= _spell_glyph_count(spell) <= count_range[1]
+		if count_range[0] <= _spell_glyph_count(spell) <= effective_max
 		and set(_spell_glyph_list(spell)).issubset(selected_set)
 	]
 	if glyph_filter:
