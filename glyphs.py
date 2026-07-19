@@ -303,10 +303,21 @@ def main() -> None:
 			f"🔒 Spells above {PLAYER_MAX_GLYPHS} glyphs are hidden. "
 			"Ask your GM for access if you need them."
 		)
+	# Only offer glyphs the player has actually selected above — no point
+	# letting them filter by a glyph they don't know.
+	known_glyphs = sorted(selected_set)
+	GLYPH_FILTER_KEY = "glyph_filter"
+	if GLYPH_FILTER_KEY in st.session_state:
+		# If a glyph was deselected up top, drop it from the filter too,
+		# otherwise Streamlit errors: multiselect value not in options.
+		st.session_state[GLYPH_FILTER_KEY] = [
+			g for g in st.session_state[GLYPH_FILTER_KEY] if g in known_glyphs
+		]
 	glyph_filter = st.multiselect(
 		"Filter spells by glyphs",
-		options=all_glyphs,
-		help="Choose one or more glyphs to narrow the spell list.",
+		options=known_glyphs,
+		help="Choose one or more of your known glyphs to narrow the spell list.",
+		key=GLYPH_FILTER_KEY,
 	)
 	match_mode = st.radio(
 		"Glyph filter mode",
