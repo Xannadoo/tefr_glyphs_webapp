@@ -244,9 +244,9 @@ def main() -> None:
 	selected_set = set(st.session_state.selected_glyphs)
 	for category_name, glyphs in GLYPH_GROUPS:
 		st.markdown(f"#### {category_name}")
-		glyph_columns = st.columns(10)
+		glyph_columns = st.columns(5)
 		for idx, glyph in enumerate(glyphs):
-			with glyph_columns[idx % 10]:
+			with glyph_columns[idx % 5]:
 				with st.container(border=True):
 					image_path = find_glyph_image(glyph)
 					render_glyph_tile(glyph, image_path)
