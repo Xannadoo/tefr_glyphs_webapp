@@ -274,27 +274,30 @@ def main() -> None:
 	SLIDER_KEY = "spell_size_range"
 	default_upper = min(PLAYER_MAX_GLYPHS, max_count)
 
-	if SLIDER_KEY not in st.session_state:
-		# First run ever: seed with the default range.
-		st.session_state[SLIDER_KEY] = (min_count, default_upper)
+	if min_count == max_count:
+		# Only one possible glyph-count value is available (typically:
+		# a locked-out player whose cap equals the smallest spell size).
+		# Streamlit's slider errors if min_value == max_value, so just
+		# fix the range instead of rendering a slider.
+		count_range = (min_count, max_count)
+		st.caption(f"Spell size: {min_count} glyphs (only size currently available to you).")
 	else:
-		# Bounds can shrink (e.g. GM access was revoked) or grow between
-		# reruns. Clamp the stored value so it's always valid before the
-		# widget is instantiated, otherwise Streamlit raises a
-		# StreamlitAPIException for an out-of-range slider value.
-		lo, hi = st.session_state[SLIDER_KEY]
-		lo = min(max(lo, min_count), max_count)
-		hi = min(max(hi, min_count), max_count)
-		if lo > hi:
-			lo, hi = hi, lo
-		st.session_state[SLIDER_KEY] = (lo, hi)
+		if SLIDER_KEY not in st.session_state:
+			st.session_state[SLIDER_KEY] = (min_count, default_upper)
+		else:
+			lo, hi = st.session_state[SLIDER_KEY]
+			lo = min(max(lo, min_count), max_count)
+			hi = min(max(hi, min_count), max_count)
+			if lo > hi:
+				lo, hi = hi, lo
+			st.session_state[SLIDER_KEY] = (lo, hi)
 
-	count_range = st.slider(
-		"Spell size (glyphs per spell)",
-		min_value=min_count,
-		max_value=max_count,
-		key=SLIDER_KEY,
-	)
+		count_range = st.slider(
+			"Spell size (glyphs per spell)",
+			min_value=min_count,
+			max_value=max_count,
+			key=SLIDER_KEY,
+		)
 	if not is_gm:
 		st.caption(
 			f"🔒 Spells above {PLAYER_MAX_GLYPHS} glyphs are hidden. "
