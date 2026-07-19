@@ -13,6 +13,9 @@ IMG_DIR = Path(__file__).with_name("img")
 GLYPH_COLUMNS = ["G1", "G2", "G3", "G4", "G5", "G6"]
 IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".bmp"]
 MAX_GLYPH_DISPLAY_PX = 57
+# Spells above this glyph count are hidden from players by default.
+# Enter the GM password in the sidebar to unlock the full spell list.
+PLAYER_MAX_GLYPHS = 2
 LINKED_GLYPH_GROUPS = [
 	{"Evu", "Sen"},
 	{"Tira", "Ekat", "Worav"},
@@ -158,18 +161,37 @@ def toggle_ked() -> None:
 	st.session_state.ked_learned = not st.session_state.ked_learned
 
 
-def check_gm_password() -> None:
-	entered = st.session_state.get("gm_password_input", "")
-	real_password = st.secrets.get("gm_password", None)
-	if real_password is None:
-		st.session_state.gm_unlocked = False
-		st.session_state.gm_password_error = "No GM password has been configured for this app yet."
-	elif entered == real_password:
-		st.session_state.gm_unlocked = True
-		st.session_state.gm_password_error = ""
-	else:
-		st.session_state.gm_unlocked = False
-		st.session_state.gm_password_error = "Incorrect password."
+def _gm_password() -> str:
+	# Set this in .streamlit/secrets.toml locally, or under
+	# App settings -> Secrets in Streamlit Community Cloud:
+	#   gm_password = "yourpassword"
+	return str(st.secrets.get("gm_password", ""))
+
+
+def render_gm_unlock() -> bool:
+	"""Sidebar GM check. Returns True if the full spell list is unlocked."""
+	with st.sidebar:
+		st.subheader("Game Master access")
+		is_gm = st.checkbox("I'm the GM", value=st.session_state.get("is_gm", False))
+		if is_gm:
+			expected = _gm_password()
+			if not expected:
+				st.warning("No gm_password set in secrets — access left locked.")
+				st.session_state.is_gm = False
+			else:
+				entered = st.text_input("GM password", type="password")
+				st.session_state.is_gm = entered == expected
+				if entered and not st.session_state.is_gm:
+					st.error("Incorrect password.")
+		else:
+			st.session_state.is_gm = False
+
+		if st.session_state.is_gm:
+			st.success(f"Unlocked — showing all spells.")
+		else:
+			st.caption(f"Players see spells up to {PLAYER_MAX_GLYPHS} glyphs.")
+
+	return bool(st.session_state.is_gm)
 
 
 def main() -> None:
@@ -189,19 +211,18 @@ def main() -> None:
 		st.error(str(err))
 		st.stop()
 
+	is_gm = render_gm_unlock()
+
 	all_glyphs = sorted({glyph for spell in spells for glyph in _spell_glyph_list(spell)})
 	counts = [_spell_glyph_count(spell) for spell in spells]
 	min_count = min(counts)
-	max_count = max(counts)
+	true_max_count = max(counts)
+	max_count = true_max_count if is_gm else min(true_max_count, PLAYER_MAX_GLYPHS)
 
 	if "selected_glyphs" not in st.session_state:
 		st.session_state.selected_glyphs = []
 	if "ked_learned" not in st.session_state:
 		st.session_state.ked_learned = False
-	if "gm_unlocked" not in st.session_state:
-		st.session_state.gm_unlocked = False
-	if "gm_password_error" not in st.session_state:
-		st.session_state.gm_password_error = ""
 
 	st.session_state.selected_glyphs = _normalize_selected_glyphs(st.session_state.selected_glyphs)
 
@@ -248,38 +269,37 @@ def main() -> None:
 						)
 
 	st.divider()
-
-	with st.expander("GM access", expanded=False):
-		if st.session_state.gm_unlocked:
-			st.success("GM access unlocked — all spell levels available.")
-			if st.button("Lock again"):
-				st.session_state.gm_unlocked = False
-				st.rerun()
-		else:
-			st.caption("Players: skip this. GMs can enter the password to unlock higher-level spells (spoilers for NPC design).")
-			st.text_input("GM password", type="password", key="gm_password_input")
-			st.button("Unlock", on_click=check_gm_password)
-			if st.session_state.gm_password_error:
-				st.error(st.session_state.gm_password_error)
-
 	st.subheader("Filters")
 
-	# Players default to 2-glyph spells and can't see beyond them.
-	# GMs (password-unlocked) get the full range, defaulting to everything.
-	player_cap = min(2, max_count)
-	if st.session_state.gm_unlocked:
-		slider_max = max_count
-		default_range = (min_count, max_count)
+	SLIDER_KEY = "spell_size_range"
+	default_upper = min(PLAYER_MAX_GLYPHS, max_count)
+
+	if SLIDER_KEY not in st.session_state:
+		# First run ever: seed with the default range.
+		st.session_state[SLIDER_KEY] = (min_count, default_upper)
 	else:
-		slider_max = player_cap
-		default_range = (min_count, player_cap)
+		# Bounds can shrink (e.g. GM access was revoked) or grow between
+		# reruns. Clamp the stored value so it's always valid before the
+		# widget is instantiated, otherwise Streamlit raises a
+		# StreamlitAPIException for an out-of-range slider value.
+		lo, hi = st.session_state[SLIDER_KEY]
+		lo = min(max(lo, min_count), max_count)
+		hi = min(max(hi, min_count), max_count)
+		if lo > hi:
+			lo, hi = hi, lo
+		st.session_state[SLIDER_KEY] = (lo, hi)
 
 	count_range = st.slider(
 		"Spell size (glyphs per spell)",
 		min_value=min_count,
-		max_value=slider_max,
-		value=default_range,
+		max_value=max_count,
+		key=SLIDER_KEY,
 	)
+	if not is_gm:
+		st.caption(
+			f"🔒 Spells above {PLAYER_MAX_GLYPHS} glyphs are hidden. "
+			"Ask your GM for access if you need them."
+		)
 	glyph_filter = st.multiselect(
 		"Filter spells by glyphs",
 		options=all_glyphs,
@@ -298,11 +318,10 @@ def main() -> None:
 	if st.session_state.ked_learned:
 		st.info("Ked learned: infinity-Key spells can be made permanent.")
 
-	effective_max = count_range[1] if st.session_state.gm_unlocked else min(count_range[1], player_cap)
 	results = [
 		spell
 		for spell in spells
-		if count_range[0] <= _spell_glyph_count(spell) <= effective_max
+		if count_range[0] <= _spell_glyph_count(spell) <= count_range[1]
 		and set(_spell_glyph_list(spell)).issubset(selected_set)
 	]
 	if glyph_filter:
