@@ -1,0 +1,38 @@
+[server]
+headless = true
+port = 8501
+enableStaticServing = true
+
+[[theme.fontFaces]]
+family="metamorphous"
+url="app/static/Metamorphous-Regular.ttf"
+style="normal"
+weight=400
+
+
+[theme]
+
+# Primary accent color. Buttons etc
+primaryColor = "#f4f9fa"
+
+# Background color of the app.
+backgroundColor = "#ffffff"
+
+# Background color used for most interactive widgets.
+secondaryBackgroundColor = "#e6f5f2"
+
+# Color used for almost all text.
+textColor = "Black"
+
+font="metamorphous"
+
+baseFontSize = 20
+
+showSidebarBorder = true
+
+[theme.sidebar]
+
+# Primary accent color.
+primaryColor = "#e6f5f2"
+
+secondaryBackgroundColor = "#f4f9fa"
