@@ -13,13 +13,13 @@ weight=400
 [theme]
 
 # Primary accent color. Buttons etc
-primaryColor = "#f4f9fa"
+primaryColor = "#9dded2"
 
 # Background color of the app.
 backgroundColor = "#ffffff"
 
 # Background color used for most interactive widgets.
-secondaryBackgroundColor = "#e6f5f2"
+secondaryBackgroundColor = "#9dded2"
 
 # Color used for almost all text.
 textColor = "Black"
@@ -33,6 +33,6 @@ showSidebarBorder = true
 [theme.sidebar]
 
 # Primary accent color.
-primaryColor = "#e6f5f2"
+primaryColor = "#9dded2"
 
-secondaryBackgroundColor = "#f4f9fa"
+secondaryBackgroundColor = "#e6f5f2"
